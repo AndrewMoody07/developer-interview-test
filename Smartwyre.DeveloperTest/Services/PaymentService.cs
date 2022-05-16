@@ -68,13 +68,7 @@ namespace Smartwyre.DeveloperTest.Services
 
             if (!result.Success) return result;
 
-            account.Balance -= request.Amount;
-
-            _dataStore.UpdateAccount(account);
-
-            var creditorAccount = _dataStore.GetAccount(request.CreditorAccountNumber);
-            creditorAccount.Balance += request.Amount;
-            _dataStore.UpdateAccount(creditorAccount);
+            ServiceHelper.UpdateBalance(request, account, _dataStore);
 
             return result;
         }
