@@ -1,18 +1,26 @@
-﻿using Smartwyre.DeveloperTest.Types;
+﻿using System.Linq;
+using Smartwyre.DeveloperTest.Types;
 
 namespace Smartwyre.DeveloperTest.Data
 {
-    public class AccountDataStore
+    public class AccountDataStore : IAccountDataStore
     {
+        private readonly SmartwyreAppDbContext _context;
+
+        public AccountDataStore(SmartwyreAppDbContext context)
+        {
+            _context = context;
+        }
+
         public Account GetAccount(string accountNumber)
         {
-            // Access database to retrieve account, code removed for brevity 
-            return new Account();
+            return _context.Accounts.FirstOrDefault(acc => acc.AccountNumber == accountNumber);
         }
 
         public void UpdateAccount(Account account)
         {
-            // Update account in database, code removed for brevity
+            _context.Update(account);
+            _context.SaveChanges();
         }
     }
 }

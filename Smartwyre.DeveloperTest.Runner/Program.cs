@@ -1,12 +1,36 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Smartwyre.DeveloperTest.Data;
+using Smartwyre.DeveloperTest.Services;
+using Smartwyre.DeveloperTest.Types;
+using System;
 
 namespace Smartwyre.DeveloperTest.Runner
 {
-    class Program
+    internal class Program
     {
-        static void Main(string[] args)
+        private static void Main()
         {
-            throw new NotImplementedException();
+            var collection = ServiceHelper.ServiceProvider();
+
+            var paymentService = collection.GetService<IPaymentService>();
+            var context = collection.GetRequiredService<SmartwyreAppDbContext>();
+
+            // Seed the in-memory database
+            AccountSeedData.Initialise(context);
+
+            paymentService?.MakePayment(new MakePaymentRequest
+            {
+                Amount = 2.0m,
+                CreditorAccountNumber = "123456",
+                DebtorAccountNumber = "345678",
+                PaymentDate = DateTime.UtcNow,
+                PaymentScheme = PaymentScheme.BankToBankTransfer
+            });
+
+            foreach (var account in context.Accounts)
+            {
+                Console.WriteLine($"Id:{account.Id} --> Balance: {account.Balance}");
+            }
         }
     }
 }

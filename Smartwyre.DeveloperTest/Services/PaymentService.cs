@@ -1,69 +1,80 @@
 ﻿using Smartwyre.DeveloperTest.Data;
 using Smartwyre.DeveloperTest.Types;
-using System.Configuration;
 
 namespace Smartwyre.DeveloperTest.Services
 {
     public class PaymentService : IPaymentService
     {
+        public SmartwyreAppDbContext Context { get; }
+        private readonly IAccountDataStore _dataStore;
+
+        public PaymentService(SmartwyreAppDbContext context, IAccountDataStore dataStore)
+        {
+            Context = context;
+            _dataStore = dataStore;
+        }
+
         public MakePaymentResult MakePayment(MakePaymentRequest request)
         {
-            var accountDataStoreGetData = new AccountDataStore();
-            Account account = accountDataStoreGetData.GetAccount(request.DebtorAccountNumber);
-            
             var result = new MakePaymentResult();
+
+            if (request == null)
+            {
+                result.Success = false;
+                return result;
+            }
+
+            var account = _dataStore.GetAccount(request.DebtorAccountNumber);
+
+            if (account == null)
+            {
+                result.Success = false;
+                return result;
+            }
 
             switch (request.PaymentScheme)
             {
                 case PaymentScheme.BankToBankTransfer:
-                    if (account == null)
-                    {
-                        result.Success = false;
-                    }
-                    else if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.BankToBankTransfer))
+                    if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.BankToBankTransfer) ||
+                        account.Balance < request.Amount)
                     {
                         result.Success = false;
                     }
                     break;
 
                 case PaymentScheme.ExpeditedPayments:
-                    if (account == null)
+                    if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.ExpeditedPayments) ||
+                        account.Balance < request.Amount)
                     {
                         result.Success = false;
                     }
-                    else if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.ExpeditedPayments))
-                    {
-                        result.Success = false;
-                    }
-                    else if (account.Balance < request.Amount)
-                    {
-                        result.Success = false;
-                    }
+
                     break;
 
                 case PaymentScheme.AutomatedPaymentSystem:
-                    if (account == null)
+                    if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.AutomatedPaymentSystem) ||
+                        account.Status != AccountStatus.Live)
                     {
                         result.Success = false;
                     }
-                    else if (!account.AllowedPaymentSchemes.HasFlag(AllowedPaymentSchemes.AutomatedPaymentSystem))
-                    {
-                        result.Success = false;
-                    }
-                    else if (account.Status != AccountStatus.Live)
-                    {
-                        result.Success = false;
-                    }
+
                     break;
+                default:
+                    {
+                        result.Success = false;
+                        break;
+                    }
             }
 
-            if (result.Success)
-            {
-                account.Balance -= request.Amount;
+            if (!result.Success) return result;
 
-                var accountDataStoreUpdateData = new AccountDataStore();
-                accountDataStoreUpdateData.UpdateAccount(account);
-            }
+            account.Balance -= request.Amount;
+
+            _dataStore.UpdateAccount(account);
+
+            var creditorAccount = _dataStore.GetAccount(request.CreditorAccountNumber);
+            creditorAccount.Balance += request.Amount;
+            _dataStore.UpdateAccount(creditorAccount);
 
             return result;
         }
